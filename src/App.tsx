@@ -5,6 +5,7 @@ import { MessageDetail } from './components/MessageDetail';
 import { ComposeModal } from './components/ComposeModal';
 import { mockMessages } from './mockData';
 import { Message, Filter, Notification } from './types';
+import { gmailService } from './services/gmail';
 
 function App() {
   const [activeTab, setActiveTab] = useState('all');
@@ -24,6 +25,21 @@ function App() {
     },
     labels: [],
   });
+
+  // Initialize Gmail service with better error handling
+  useEffect(() => {
+    const initGmail = async () => {
+      try {
+        const success = await gmailService.initialize();
+        if (!success) {
+          console.warn('Gmail initialization failed. Some features may be limited.');
+        }
+      } catch (error) {
+        console.error('Failed to initialize Gmail:', error);
+      }
+    };
+    initGmail();
+  }, []);
 
   // Mock notifications
   const [notifications, setNotifications] = useState<Notification[]>([
@@ -126,4 +142,4 @@ function App() {
   );
 }
 
-export default App;
+export default App

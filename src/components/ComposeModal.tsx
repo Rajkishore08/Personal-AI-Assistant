@@ -1,34 +1,46 @@
 import React, { useState } from 'react';
 import { X, Send, Paperclip } from 'lucide-react';
 import { useWhatsApp } from '../hooks/useWhatsApp';
+import { useGmail } from '../hooks/useGmail';
 
 interface ComposeModalProps {
   onClose: () => void;
 }
 
 export const ComposeModal: React.FC<ComposeModalProps> = ({ onClose }) => {
+  const [platform, setPlatform] = useState<'gmail' | 'whatsapp'>('gmail');
   const [recipient, setRecipient] = useState('');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { sendMessage, isConnected } = useWhatsApp();
+  const { sendMessage: sendWhatsApp, isConnected: isWhatsAppConnected } = useWhatsApp();
+  const { sendEmail, isConnected: isGmailConnected } = useGmail();
 
   const handleSend = async () => {
-    if (!isConnected) {
+    if (platform === 'whatsapp' && !isWhatsAppConnected) {
       setError('WhatsApp service not connected');
       return;
     }
 
-    if (!recipient || !message) {
+    if (platform === 'gmail' && !isGmailConnected) {
+      setError('Gmail service not connected');
+      return;
+    }
+
+    if (!recipient || !message || (platform === 'gmail' && !subject)) {
       setError('Please fill in all required fields');
       return;
     }
 
     try {
       setSending(true);
-      await sendMessage(recipient, message);
+      if (platform === 'whatsapp') {
+        await sendWhatsApp(recipient, message);
+      } else {
+        await sendEmail(recipient, subject, message);
+      }
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send message');
@@ -58,24 +70,51 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({ onClose }) => {
           )}
 
           <div className="space-y-4">
+            <div className="flex space-x-4">
+              <button
+                onClick={() => setPlatform('gmail')}
+                className={`flex-1 py-2 rounded-lg transition-colors ${
+                  platform === 'gmail'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                Gmail
+              </button>
+              <button
+                onClick={() => setPlatform('whatsapp')}
+                className={`flex-1 py-2 rounded-lg transition-colors ${
+                  platform === 'whatsapp'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                WhatsApp
+              </button>
+            </div>
+
             <div>
               <input
                 type="text"
-                placeholder="To (WhatsApp number)"
+                placeholder={platform === 'gmail' ? 'To (email)' : 'To (WhatsApp number)'}
                 value={recipient}
                 onChange={(e) => setRecipient(e.target.value)}
                 className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
-            <div>
-              <input
-                type="text"
-                placeholder="Subject (optional)"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
+
+            {platform === 'gmail' && (
+              <div>
+                <input
+                  type="text"
+                  placeholder="Subject"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            )}
+
             <div>
               <textarea
                 placeholder="Type your message..."
@@ -104,9 +143,10 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({ onClose }) => {
             </button>
             <button
               onClick={handleSend}
-              disabled={sending || !isConnected}
+              disabled={sending || (platform === 'whatsapp' ? !isWhatsAppConnected : !isGmailConnected)}
               className={`px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 ${
-                (sending || !isConnected) && 'opacity-50 cursor-not-allowed'
+                (sending || (platform === 'whatsapp' ? !isWhatsAppConnected : !isGmailConnected)) &&
+                'opacity-50 cursor-not-allowed'
               }`}
             >
               <Send size={16} />
